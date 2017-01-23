@@ -1,0 +1,192 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div ng-app="mojaAplikacja" ng-controller="kontroler">
+    <h1>Osoby</h1>
+
+    <!-- tabela danych -->
+    <table class="table table-striped table-bordered">
+        <thead>
+            <tr>
+                <th>No.</th>
+                <th>Id</th>
+                <th>Imie</th>
+                <th>Nazwisko</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr ng-repeat="osoba in osoby" ng-click="akcja($index)">
+                <td>
+                    {{ $index }}
+                </td>
+                <td>
+                    {{ osoba.id }}
+                </td>
+                <td>
+                    {{ osoba.imie }}
+                </td>
+                <td>
+                    {{ osoba.nazwisko }}
+                </td>
+                <td>
+                    <button type="button" class="btn btn-info" 
+                            data-toggle="modal" data-target="#myModal" 
+                            data-backdrop="static">Akcja</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- formularz dodawania nowej osoby -->
+    <h1>Dodaj osobe</h1>
+    <button class="btn btn-info" name="rozwinBtn" ng-click="rozwijanie()">Rozwin/Zwin</button>
+    <br/><br/>
+
+    <div id="formDiv" style="display: none">
+        <form class="form-group" name="formularz" ng-submit="wyslij()">
+            Imie: <input type="text" name="imie" class="input-group" ng-model="nowaOsoba.imie" required />
+            <span ng-hide="formularz.imie.$valid" style="color: red">Musisz wpisac imie!</span>
+            <br />
+
+            Nazwisko: <input type="text" name="nazwisko" class="input-group" ng-model="nowaOsoba.nazwisko" required />
+            <span ng-hide="formularz.nazwisko.$valid" style="color: red">Musisz wpisac nazwisko!</span>
+            <br />
+            <input type="submit"
+                   ng-disabled="!(formularz.imie.$valid && formularz.nazwisko.$valid)"
+                   class="btn btn-success" value="Dodaj" />
+        </form>
+
+        <p>{{ komunikat }}</p>
+    </div>
+    
+    <!-- okno modalne do usuwania i edycji -->
+    <div class="modal fade" id="myModal" role="dialog">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">Akcja: {{ osoby[indeks].imie + ' ' + osoby[indeks].nazwisko }}</h4>
+                </div>
+                <div class="modal-body">
+                    <form class="form-group" name="formularz2" ng-submit="edytuj()">
+                        Imie: <input type="text" name="imie2"
+                                     class="input-group" ng-model="osoby[indeks].imie" required />
+                        <span ng-hide="formularz2.imie2.$valid" style="color: red">Musisz wpisac imie!</span>
+                        <br />
+                        Nazwisko: <input type="text" name="nazwisko2"
+                                         class="input-group" ng-model="osoby[indeks].nazwisko" required />
+                        <span ng-hide="formularz2.nazwisko2.$valid" style="color: red">Musisz wpisac nazwisko!</span>
+                        <br />
+                        <input type="submit"
+                               ng-disabled="!(formularz2.imie2.$valid && formularz2.nazwisko2.$valid)"
+                               ng-click="edytuj()"
+                               class="btn btn-info" value="Edytuj" />
+                    </form>
+                    <button type="button" ng-click="usun()"
+                            class="btn btn-danger" data-dismiss="modal">Usun</button>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" 
+                            ng-click="przywroc()" data-dismiss="modal">
+                        Zamknij
+                    </button>
+                    <p> {{ komunikat2 }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    var app = angular.module('mojaAplikacja', []);
+
+    app.controller('kontroler', function ($scope, $http) {
+        $scope.indeks = -1;
+        $scope.s_imie = null;
+        $scope.s_nazwisko = null;
+        $http.get('/api/osoby').then(function (response) {
+            $scope.osoby = response.data;
+        });
+
+        $scope.wyslij = function () {
+            $http({
+                method: 'POST',
+                url: '/api/osoby',
+                data: {
+                    imie: $scope.nowaOsoba.imie,
+                    nazwisko: $scope.nowaOsoba.nazwisko
+                }
+            }).then(function onSuccess(response) {
+                $scope.komunikat = 'Sukces!';
+                var osobaOdp = response.data;
+                $scope.osoby.push({
+                    id: osobaOdp.id,
+                    imie: osobaOdp.imie,
+                    nazwisko: osobaOdp.nazwisko
+                });
+            }, function onFail() {
+                $scope.komunikat = 'Blad serwera.';
+            });
+        }
+
+        $scope.akcja = function (index) {
+            $scope.indeks = index;
+            $scope.s_imie = $scope.osoby[index].imie;
+            $scope.s_nazwisko = $scope.osoby[index].nazwisko;
+        }
+
+        $scope.usun = function () {
+            var indeks = $scope.indeks;
+
+            $http(
+            {
+                  method: 'DELETE',
+                  url: '/api/osoby',
+                  headers: {
+                      'Content-Type': 'application/json'
+                  },
+                  data: $scope.osoby[indeks]
+            }).then(function onSuccess() {
+                $scope.komunikat2 = 'Sukces!';
+                if (indeks > -1) {
+                    $scope.osoby.splice(indeks, 1);
+                }                                
+            }, function onFail() {
+                $scope.komunikat2 = 'Blad serwera.';
+                $('#myModal').modal('toggle');
+            });
+        }
+
+        $scope.edytuj = function () {
+            var indeks = $scope.indeks;
+
+            $http({
+                method: 'PUT',
+                url: '/api/osoby',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                data: $scope.osoby[indeks]
+            }).then(function onSuccess(response) {
+                $scope.komunikat2 = 'Sukces!';
+                $scope.s_imie = $scope.osoby[indeks].imie;
+                $scope.s_nazwisko = $scope.osoby[indeks].nazwisko;
+            }, function onFail() {
+                $scope.komunikat = 'Blad serwera.';
+            });
+        }
+
+        $scope.przywroc = function () {
+            var indeks = $scope.indeks;
+            $scope.osoby[indeks].imie = $scope.s_imie;
+            $scope.osoby[indeks].nazwisko = $scope.s_nazwisko;
+        }
+
+        $scope.rozwijanie = function () {
+            $('#formDiv').fadeToggle('slow');
+        }        
+    });
+</script>
